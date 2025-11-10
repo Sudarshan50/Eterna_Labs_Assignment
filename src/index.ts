@@ -6,17 +6,17 @@ import dotenv from "dotenv";
 import {
   globalErrorHandler,
   notFoundHandler,
-} from "./src/middleware/errorHandler.js";
-import { successResponse } from "./src/lib/responseUtils.js";
-import db from "./src/lib/db.js";
-import { connectToRedis } from "./src/lib/redis.js";
-import router from "./src/routes/index.js";
+} from "./middleware/errorHandler.js";
+import { successResponse } from "./lib/responseUtils.js";
+import db from "./lib/db.js";
+import { connectToRedis } from "./lib/redis.js";
+import router from "./routes/index.js";
 
 dotenv.config();
 
 const app = express();
 const server = createServer(app);
-const PORT = process.env.PORT || 3000;
+const PORT: number = parseInt(process.env.PORT || '3000', 10);
 
 app.use(morgan("dev"));
 app.use(cors());
@@ -24,7 +24,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-app.get("/", (req, res) => {
+app.get("/", (req: express.Request, res: express.Response) => {
   successResponse(res, null, "The service is healthy and running!");
 });
 
@@ -35,7 +35,7 @@ app.use(globalErrorHandler);
 
 db()
   .then(() => {
-    connectToRedis().catch((err) => {
+    connectToRedis().catch((err: Error) => {
       console.error("Failed to connect to Redis", err);
       process.exit(1);
     });
@@ -45,7 +45,7 @@ db()
       console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
     });
   })
-  .catch((err) => {
+  .catch((err: Error) => {
     console.error("Failed to connect to the database", err);
     process.exit(1);
   });

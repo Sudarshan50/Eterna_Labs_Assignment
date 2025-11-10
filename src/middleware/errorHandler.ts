@@ -1,14 +1,29 @@
+import { Request, Response, NextFunction } from "express";
 import { errorResponse } from "../lib/responseUtils.js";
 import { CustomError } from "../lib/customErrors.js";
 
+interface MongoError extends Error {
+  code?: number;
+  keyValue?: { [key: string]: any };
+}
+
+interface MulterError extends Error {
+  code?: string;
+}
+
 /**
  * Global error handler middleware
- * @param {Error} err - Error object
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
+ * @param err - Error object
+ * @param req - Express request object
+ * @param res - Express response object
+ * @param next - Express next function
  */
-const globalErrorHandler = (err, req, res, next) => {
+export const globalErrorHandler = (
+  err: Error | CustomError | MongoError | MulterError,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
   // Log error details (in production, use proper logging service)
   console.error("Error occurred:", {
     message: err.message,
@@ -26,13 +41,14 @@ const globalErrorHandler = (err, req, res, next) => {
   }
 
   // Handle validation errors (e.g., from express-validator)
-  if (err.name === "ValidationError" && err.errors) {
-    return errorResponse(res, "Validation Error", 400, err.errors);
+  if (err.name === "ValidationError" && 'errors' in err) {
+    return errorResponse(res, "Validation Error", 400, (err as any).errors);
   }
 
   // Handle MongoDB duplicate key error
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
+  if ('code' in err && err.code === 11000) {
+    const mongoErr = err as MongoError;
+    const field = mongoErr.keyValue ? Object.keys(mongoErr.keyValue)[0] : 'field';
     return errorResponse(res, `${field} already exists`, 409);
   }
 
@@ -51,17 +67,17 @@ const globalErrorHandler = (err, req, res, next) => {
   }
 
   // Handle multer errors (file upload)
-  if (err.code === "LIMIT_FILE_SIZE") {
+  if ('code' in err && err.code === "LIMIT_FILE_SIZE") {
     return errorResponse(res, "File size too large", 400);
   }
 
   // Handle SyntaxError (malformed JSON)
-  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+  if (err instanceof SyntaxError && 'status' in err && (err as any).status === 400 && "body" in err) {
     return errorResponse(res, "Invalid JSON format", 400);
   }
 
   // Default error response
-  const statusCode = err.statusCode || 500;
+  const statusCode = 'statusCode' in err ? (err as CustomError).statusCode || 500 : 500;
   const message =
     process.env.NODE_ENV === "production"
       ? "Something went wrong!"
@@ -77,23 +93,23 @@ const globalErrorHandler = (err, req, res, next) => {
 
 /**
  * 404 Not Found handler middleware
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
+ * @param req - Express request object
+ * @param res - Express response object
+ * @param next - Express next function
  */
-const notFoundHandler = (req, res, next) => {
+export const notFoundHandler = (req: Request, res: Response, next: NextFunction): Response => {
   return errorResponse(res, `Route ${req.originalUrl} not found`, 404);
 };
 
 /**
  * Async error wrapper
  * Wraps async route handlers to catch errors and pass them to error handler
- * @param {Function} fn - Async function to wrap
+ * @param fn - Async function to wrap
  */
-const asyncErrorHandler = (fn) => {
-  return (req, res, next) => {
+export const asyncErrorHandler = (
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
-
-export { globalErrorHandler, notFoundHandler, asyncErrorHandler };
