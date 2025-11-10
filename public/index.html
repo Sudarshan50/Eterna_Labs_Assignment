@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Real-time Meme Coin Tracker</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f23;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(102, 126, 234, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(118, 75, 162, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%),
+                radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.15) 0px, transparent 50%);
+            color: #e5e7eb;
+            padding: 20px;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                linear-gradient(90deg, rgba(102, 126, 234, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(102, 126, 234, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header Section */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 40px 20px;
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            font-size: 3.5em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(20deg); }
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            color: rgba(229, 231, 235, 0.7);
+            font-weight: 400;
+            margin-bottom: 20px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #a5b4fc;
+        }
+
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+        }
+
+        /* Controls */
+        .controls {
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(20px);
+            padding: 24px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .controls-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #e5e7eb;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .controls button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .controls button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .controls button:active {
+            transform: translateY(0);
+        }
+
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .filters select, .filters input {
+            padding: 12px 16px;
+            background: rgba(31, 41, 55, 0.6);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 10px;
+            font-size: 0.9em;
+            color: #e5e7eb;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .filters select:focus, .filters input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .filters select option {
+            background: #1f2937;
+            color: #e5e7eb;
+        }
+
+        .filters input::placeholder {
+            color: rgba(229, 231, 235, 0.4);
+        }
+
+        /* Tokens Grid */
+        .tokens-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        /* Pagination */
+        .pagination {
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(20px);
+            padding: 20px 24px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .pagination-info {
+            color: rgba(229, 231, 235, 0.8);
+            font-size: 0.95em;
+            font-weight: 500;
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .pagination button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: rgba(102, 126, 234, 0.3);
+        }
+
+        .pagination-page {
+            color: #e5e7eb;
+            font-weight: 600;
+            padding: 10px 16px;
+            background: rgba(31, 41, 55, 0.6);
+            border-radius: 10px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .token-card {
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .token-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            transform: scale(0);
+            transition: transform 0.6s;
+        }
+
+        .token-card:hover::before {
+            transform: scale(1);
+        }
+
+        .token-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 50px rgba(102, 126, 234, 0.3);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .token-card.updated {
+            animation: cardPulse 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes cardPulse {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+            50% { 
+                transform: scale(1.03);
+                box-shadow: 0 20px 40px rgba(102, 126, 234, 0.4);
+            }
+        }
+
+        .token-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .token-info {
+            flex: 1;
+        }
+
+        .token-name {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #f3f4f6;
+            margin-bottom: 4px;
+            letter-spacing: -0.01em;
+        }
+
+        .token-chain {
+            font-size: 0.8em;
+            color: rgba(229, 231, 235, 0.5);
+            font-weight: 500;
+        }
+
+        .token-symbol {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .token-price {
+            font-size: 2.2em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .token-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .metric {
+            padding: 14px;
+            background: rgba(31, 41, 55, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            transition: all 0.3s;
+        }
+
+        .metric:hover {
+            background: rgba(31, 41, 55, 0.6);
+            border-color: rgba(102, 126, 234, 0.3);
+            transform: scale(1.05);
+        }
+
+        .metric-label {
+            font-size: 0.75em;
+            color: rgba(229, 231, 235, 0.5);
+            margin-bottom: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metric-value {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #e5e7eb;
+        }
+
+        .positive {
+            color: #10b981 !important;
+        }
+
+        .negative {
+            color: #ef4444 !important;
+        }
+
+        /* Events Section */
+        .events {
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(20px);
+            padding: 24px;
+            border-radius: 16px;
+            margin-top: 30px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .events::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .events::-webkit-scrollbar-track {
+            background: rgba(31, 41, 55, 0.3);
+            border-radius: 10px;
+        }
+
+        .events::-webkit-scrollbar-thumb {
+            background: rgba(102, 126, 234, 0.5);
+            border-radius: 10px;
+        }
+
+        .events::-webkit-scrollbar-thumb:hover {
+            background: rgba(102, 126, 234, 0.7);
+        }
+
+        .events h3 {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #f3f4f6;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .event {
+            padding: 16px;
+            border-left: 3px solid #667eea;
+            margin-bottom: 12px;
+            background: rgba(31, 41, 55, 0.4);
+            border-radius: 8px;
+            transition: all 0.3s;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .event:hover {
+            background: rgba(31, 41, 55, 0.6);
+            transform: translateX(4px);
+        }
+
+        .event.spike {
+            border-left-color: #f59e0b;
+        }
+
+        .event.error {
+            border-left-color: #ef4444;
+        }
+
+        .event.info {
+            border-left-color: #3b82f6;
+        }
+
+        .event.update {
+            border-left-color: #10b981;
+        }
+
+        .event-time {
+            font-size: 0.8em;
+            color: rgba(229, 231, 235, 0.5);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .event-message {
+            color: #e5e7eb;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: rgba(229, 231, 235, 0.6);
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        .loading::after {
+            content: '';
+            display: block;
+            width: 50px;
+            height: 50px;
+            margin: 20px auto 0;
+            border: 4px solid rgba(102, 126, 234, 0.2);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5em;
+            }
+
+            .header {
+                padding: 30px 16px;
+            }
+
+            .tokens-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .filters {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .controls button {
+                width: 100%;
+            }
+        }
+
+        /* Utility Classes */
+        .text-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glow {
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 Real-time Meme Coin Tracker</h1>
+            <p class="subtitle">Live updates from DexScreener & GeckoTerminal with advanced analytics</p>
+            <div class="badge">
+                <span class="badge-dot"></span>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="controls-header">
+                <h3 class="controls-title">⚙️ Controls & Filters</h3>
+            </div>
+            <div class="button-group">
+                <button onclick="refreshAllTokens()">🔄 Refresh All Tokens</button>
+                <button onclick="clearCache()">🗑️ Clear Cache</button>
+                <button onclick="triggerUpdate()">⚡ Manual Update</button>
+                <button onclick="clearEvents()">📋 Clear Event Log</button>
+            </div>
+            
+            <div class="filters">
+                <select id="timePeriod" onchange="applyFilters()">
+                    <option value="24h">📅 24 Hours</option>
+                    <option value="6h">⏰ 6 Hours</option>
+                    <option value="1h">⏱️ 1 Hour</option>
+                    <option value="7d">📆 7 Days</option>
+                </select>
+                <select id="sortBy" onchange="applyFilters()">
+                    <option value="volume">💰 Sort by Volume</option>
+                    <option value="priceChange">📈 Sort by Price Change</option>
+                    <option value="marketCap">💎 Sort by Market Cap</option>
+                    <option value="fdv">🏦 Sort by FDV</option>
+                    <option value="liquidity">💧 Sort by Liquidity</option>
+                    <option value="price">💵 Sort by Price</option>
+                </select>
+                <select id="sortOrder" onchange="applyFilters()">
+                    <option value="desc">⬇️ Descending</option>
+                    <option value="asc">⬆️ Ascending</option>
+                </select>
+                <input type="number" id="minVolume" placeholder="💰 Min Volume" onchange="applyFilters()">
+                <input type="number" id="minLiquidity" placeholder="💧 Min Liquidity" onchange="applyFilters()">
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination">
+            <div class="pagination-info">
+                <span id="paginationInfo">Showing 1-10 of 20 tokens</span>
+            </div>
+            <div class="pagination-controls">
+                <button id="prevBtn" onclick="previousPage()" disabled>
+                    ⬅️ Previous
+                </button>
+                <div class="pagination-page">
+                    Page <span id="currentPage">1</span> of <span id="totalPages">2</span>
+                </div>
+                <button id="nextBtn" onclick="nextPage()">
+                    Next ➡️
+                </button>
+            </div>
+        </div>
+
+        <!-- Tokens Grid -->
+        <div class="tokens-grid" id="tokensGrid">
+            <div class="loading">Loading tokens...</div>
+        </div>
+
+        <!-- Events Log -->
+        <div class="events">
+            <h3>📡 Live Event Log</h3>
+            <div id="eventsList"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:3000', {
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: Infinity,
+            transports: ['websocket', 'polling']
+        });
+        
+        let tokens = [];
+        let priceUpdateCount = 0;
+        let volumeSpikeCount = 0;
+        let reconnectAttempts = 0;
+
+        // Pagination state
+        let currentPage = 1;
+        let totalPages = 1;
+        let totalTokens = 0;
+        let currentCursor = '0';
+        let hasMorePages = false;
+
+        // Socket connection handlers
+        socket.on('connect', () => {
+            document.getElementById('statusText').textContent = 'Live';
+            addEvent('✅ Connected to WebSocket server', 'info');
+            reconnectAttempts = 0;
+        });
+
+        socket.on('disconnect', (reason) => {
+            document.getElementById('statusText').textContent = 'Offline';
+            addEvent(`⚠️ Disconnected: ${reason}`, 'error');
+        });
+        
+        socket.on('reconnect_attempt', () => {
+            reconnectAttempts++;
+            document.getElementById('statusText').textContent = 'Reconnecting...';
+            addEvent(`🔄 Reconnecting (attempt ${reconnectAttempts})`, 'info');
+        });
+        
+        socket.on('reconnect', (attemptNumber) => {
+            addEvent(`✅ Reconnected after ${attemptNumber} attempt(s)`, 'info');
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+            addEvent(`❌ Connection error: ${error.message}`, 'error');
+        });
+
+        // Initial data
+        socket.on('initial_data', (data) => {
+            tokens = data.data.slice(0, 10); // Only show first 10 tokens
+            
+            // Initialize pagination
+            totalTokens = data.data.length;
+            currentPage = 1;
+            totalPages = Math.ceil(totalTokens / 10);
+            hasMorePages = totalTokens > 10;
+            currentCursor = '0';
+            
+            renderTokens(tokens);
+            updatePaginationUI();
+            addEvent(`📦 Loaded ${tokens.length} tokens (showing 10 per page)`, 'info');
+        });
+
+        // Price updates (single)
+        socket.on('price_update', (event) => {
+            const data = event.data;
+            priceUpdateCount++;
+            
+            // Update token in list
+            const tokenIndex = tokens.findIndex(t => t.tokenId === data.tokenId);
+            if (tokenIndex !== -1) {
+                tokens[tokenIndex].priceUsd = data.priceUsd;
+                highlightToken(data.tokenId);
+            }
+            
+            addEvent(`💰 ${data.symbol}: $${data.priceUsd.toFixed(6)} (${data.priceChange > 0 ? '+' : ''}${data.priceChange.toFixed(2)}%)`, 'update');
+        });
+        
+        // Price updates (batch)
+        socket.on('price_updates', (event) => {
+            const updates = event.data;
+            priceUpdateCount += updates.length;
+            
+            updates.forEach(data => {
+                const tokenIndex = tokens.findIndex(t => t.tokenId === data.tokenId);
+                if (tokenIndex !== -1) {
+                    tokens[tokenIndex].priceUsd = data.priceUsd;
+                    tokens[tokenIndex].volume.h24 = data.volume;
+                    highlightToken(data.tokenId);
+                }
+            });
+            
+            renderTokens(tokens);
+            addEvent(`📊 Updated ${updates.length} token price(s)`, 'update');
+        });
+
+        // Volume spikes (single)
+        socket.on('volume_spike', (event) => {
+            const data = event.data;
+            volumeSpikeCount++;
+            addEvent(`🚀 ${data.symbol}: Volume spike +${data.percentageIncrease.toFixed(2)}%`, 'spike');
+        });
+        
+        // Volume spikes (batch)
+        socket.on('volume_spikes', (event) => {
+            const spikes = event.data;
+            volumeSpikeCount += spikes.length;
+            
+            spikes.forEach(data => {
+                addEvent(`🚀 ${data.symbol}: Volume spike +${data.percentageIncrease.toFixed(2)}%`, 'spike');
+            });
+        });
+
+        // Render tokens
+        function renderTokens(tokenList) {
+            const grid = document.getElementById('tokensGrid');
+            grid.innerHTML = tokenList.map(token => `
+                <div class="token-card" id="token-${token.tokenId}">
+                    <div class="token-header">
+                        <div class="token-info">
+                            <div class="token-name">${token.name}</div>
+                            <div class="token-chain">🔗 ${token.chainId || 'Unknown'}</div>
+                        </div>
+                        <div class="token-symbol">${token.symbol}</div>
+                    </div>
+                    <div class="token-price">$${token.priceUsd.toFixed(6)}</div>
+                    <div class="token-metrics">
+                        <div class="metric">
+                            <div class="metric-label">24h Change</div>
+                            <div class="metric-value ${token.priceChange.h24 >= 0 ? 'positive' : 'negative'}">
+                                ${token.priceChange.h24 >= 0 ? '▲' : '▼'} ${Math.abs(token.priceChange.h24).toFixed(2)}%
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">24h Volume</div>
+                            <div class="metric-value">$${formatNumber(token.volume.h24)}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Market Cap</div>
+                            <div class="metric-value">${token.marketCap ? '$' + formatNumber(token.marketCap) : 'N/A'}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Liquidity</div>
+                            <div class="metric-value">$${formatNumber(token.liquidity)}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function highlightToken(tokenId) {
+            const card = document.getElementById(`token-${tokenId}`);
+            if (card) {
+                card.classList.add('updated');
+                setTimeout(() => card.classList.remove('updated'), 1000);
+            }
+        }
+
+        function addEvent(message, type = 'info') {
+            const eventsList = document.getElementById('eventsList');
+            const event = document.createElement('div');
+            event.className = `event ${type}`;
+            event.innerHTML = `
+                <div class="event-time">${new Date().toLocaleTimeString()}</div>
+                <div class="event-message">${message}</div>
+            `;
+            eventsList.insertBefore(event, eventsList.firstChild);
+            
+            // Keep only last 30 events
+            while (eventsList.children.length > 30) {
+                eventsList.removeChild(eventsList.lastChild);
+            }
+        }
+
+        function formatNumber(num) {
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+            return num.toFixed(2);
+        }
+
+        async function refreshAllTokens() {
+            try {
+                const response = await fetch('http://localhost:3000/api/tokens/refresh', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                addEvent('All tokens refreshed', 'info');
+            } catch (error) {
+                addEvent('Failed to refresh tokens', 'error');
+            }
+        }
+
+        async function clearCache() {
+            try {
+                const response = await fetch('http://localhost:3000/api/cache', {
+                    method: 'DELETE'
+                });
+                addEvent('Cache cleared', 'info');
+            } catch (error) {
+                addEvent('Failed to clear cache', 'error');
+            }
+        }
+
+        async function triggerUpdate() {
+            try {
+                const response = await fetch('http://localhost:3000/api/scheduler/trigger', {
+                    method: 'POST'
+                });
+                addEvent('Manual update triggered', 'info');
+            } catch (error) {
+                addEvent('Failed to trigger update', 'error');
+            }
+        }
+
+        function clearEvents() {
+            document.getElementById('eventsList').innerHTML = '';
+        }
+
+        async function applyFilters(cursor = '0') {
+            const timePeriod = document.getElementById('timePeriod').value;
+            const sortBy = document.getElementById('sortBy').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            const minVolume = document.getElementById('minVolume').value;
+            const minLiquidity = document.getElementById('minLiquidity').value;
+
+            let url = `http://localhost:3000/api/tokens?timePeriod=${timePeriod}&sortBy=${sortBy}&sortOrder=${sortOrder}&limit=10&cursor=${cursor}`;
+            if (minVolume) url += `&minVolume=${minVolume}`;
+            if (minLiquidity) url += `&minLiquidity=${minLiquidity}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                tokens = data.data.data;
+                
+                // Update pagination info
+                const pagination = data.data.pagination;
+                totalTokens = pagination.total;
+                hasMorePages = pagination.hasMore;
+                currentCursor = cursor;
+                
+                // Calculate pages
+                currentPage = Math.floor(parseInt(cursor) / 10) + 1;
+                totalPages = Math.ceil(totalTokens / 10);
+                
+                // Update UI
+                renderTokens(tokens);
+                updatePaginationUI();
+                addEvent(`✨ Filters applied - ${tokens.length} tokens displayed`, 'info');
+            } catch (error) {
+                addEvent('❌ Failed to apply filters', 'error');
+            }
+        }
+
+        function updatePaginationUI() {
+            // Update pagination info
+            const start = (currentPage - 1) * 10 + 1;
+            const end = Math.min(currentPage * 10, totalTokens);
+            document.getElementById('paginationInfo').textContent = `Showing ${start}-${end} of ${totalTokens} tokens`;
+            
+            // Update page numbers
+            document.getElementById('currentPage').textContent = currentPage;
+            document.getElementById('totalPages').textContent = totalPages;
+            
+            // Update button states
+            document.getElementById('prevBtn').disabled = currentPage <= 1;
+            document.getElementById('nextBtn').disabled = !hasMorePages;
+        }
+
+        function nextPage() {
+            if (hasMorePages) {
+                const nextCursor = String(parseInt(currentCursor) + 10);
+                applyFilters(nextCursor);
+            }
+        }
+
+        function previousPage() {
+            if (currentPage > 1) {
+                const prevCursor = String(Math.max(0, parseInt(currentCursor) - 10));
+                applyFilters(prevCursor);
+            }
+        }
+    </script>
+</body>
+</html>
